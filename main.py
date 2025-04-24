@@ -1,56 +1,39 @@
-# main.py
-import threading
 import time
-from ir_sensor import IRSensor
+import threading
 from stepper_motor import StepperMotor
+from ir_sensor import IRSensor
 
-IR_PIN = 17
-STEPPER_PINS = [18, 23, 24, 25]  # adjust according to your wiring
+# Initialize IR sensor and stepper motor
+ir_sensor = IRSensor(pin=17)
+motor = StepperMotor(in1=18, in2=23, in3=24, in4=25)
 
-ir = IRSensor(IR_PIN)
-motor = StepperMotor(STEPPER_PINS)
+# Shared state
 current_angle = 0
-lock = threading.Lock()
-
-def ir_thread_func():
-    global ir_detected
-    while True:
-        if ir.is_object_detected():
-            ir_detected = True
-        else:
-            ir_detected = False
-        time.sleep(0.2)
 
 def motor_thread_func():
     global current_angle
     while True:
-        if ir_detected:
-            with lock:
-                if current_angle != 90:
-                    motor.go_to_angle(current_angle, 90)
-                    current_angle = 90
-                time.sleep(15)
-                motor.go_to_angle(current_angle, 180)
-                current_angle = 180
-                time.sleep(10)
-                motor.go_to_angle(current_angle, 0)
-                current_angle = 0
-                time.sleep(10)
+        if ir_sensor.is_object_detected():
+            print("Object detected!")
+
+            # Go from 0 to 90
+            current_angle = motor.go_to_angle(current_angle, 90)
+            time.sleep(15)
+
+            # Go from 90 to 180
+            current_angle = motor.go_to_angle(current_angle, 180)
+            time.sleep(10)
+
+            # Go back to 0
+            current_angle = motor.go_to_angle(current_angle, 0)
+            time.sleep(10)
         else:
-            time.sleep(1)
+            time.sleep(0.1)
 
 try:
-    ir_detected = False
-    ir_thread = threading.Thread(target=ir_thread_func, daemon=True)
-    motor_thread = threading.Thread(target=motor_thread_func, daemon=True)
-
-    ir_thread.start()
+    # Start motor thread
+    motor_thread = threading.Thread(target=motor_thread_func)
     motor_thread.start()
-
-    while True:
-        time.sleep(1)
-
 except KeyboardInterrupt:
-    print("Cleaning up GPIO...")
-    ir.cleanup()
-    motor.cleanup()
+    print("Exiting...")
+    GPIO.cleanup()
